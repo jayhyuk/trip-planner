@@ -9,7 +9,7 @@ python3 app.py
 ```
 
 By default, the server listens at `http://127.0.0.1:8000` and connects to the
-existing `travel_planner.db` beside `app.py`. Create this database with
+existing `db_file.sql` beside `app.py`. Create this database with
 `schema.sql` before starting the server. Set `TRAVEL_PLANNER_DB`,
 `TRAVEL_PLANNER_HOST`, or `TRAVEL_PLANNER_PORT` to override those defaults.
 

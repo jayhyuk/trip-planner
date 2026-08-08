@@ -14,7 +14,7 @@ from urllib.parse import unquote, urlparse
 
 
 BASE_DIR = Path(__file__).resolve().parent
-DATABASE_PATH = Path(os.environ.get("TRAVEL_PLANNER_DB", BASE_DIR / "travel_planner.db"))
+DATABASE_PATH = Path(os.environ.get("TRAVEL_PLANNER_DB", BASE_DIR / "db_file.sql"))
 OPENAPI_PATH = BASE_DIR / "openapi.json"
 SWAGGER_UI_PATH = BASE_DIR / "swagger.html"
 VERCEL_FRONTEND_ORIGIN = "https://trip-planner-psi-ruby.vercel.app"
@@ -418,8 +418,8 @@ class TravelPlannerHandler(BaseHTTPRequestHandler):
 
 
 def main():
-    host = os.environ.get("TRAVEL_PLANNER_HOST", "127.0.0.1")
-    port = int(os.environ.get("TRAVEL_PLANNER_PORT", "8000"))
+    host = os.environ.get("TRAVEL_PLANNER_HOST", "0.0.0.0")
+    port = int(os.environ.get("TRAVEL_PLANNER_PORT", "9189"))
     server = ThreadingHTTPServer((host, port), TravelPlannerHandler)
     print(f"Travel Planner API listening on http://{host}:{port}")
     try:
