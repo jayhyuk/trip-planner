@@ -1,0 +1,241 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Travel Planner API",
+    "version": "1.0.0",
+    "description": "API for trips, daily itineraries, locations, transportation, and accommodations."
+  },
+  "servers": [
+    { "url": "/", "description": "Current server" }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Check API health",
+        "responses": { "200": { "description": "Server is available" } }
+      }
+    },
+    "/api/trips": {
+      "get": {
+        "summary": "List trips",
+        "responses": { "200": { "description": "Trips", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Trip" } } } } } }
+      },
+      "post": {
+        "summary": "Create a trip",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Trip" } } } },
+        "responses": { "201": { "description": "Created" }, "400": { "$ref": "#/components/responses/BadRequest" }, "409": { "$ref": "#/components/responses/Conflict" } }
+      }
+    },
+    "/api/trips/{trip_key}": {
+      "parameters": [{ "$ref": "#/components/parameters/TripKey" }],
+      "get": {
+        "summary": "Get a trip",
+        "responses": { "200": { "description": "Trip", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Trip" } } } }, "404": { "$ref": "#/components/responses/NotFound" } }
+      },
+      "put": {
+        "summary": "Update a trip",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TripUpdate" } } } },
+        "responses": { "200": { "description": "Updated" }, "400": { "$ref": "#/components/responses/BadRequest" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      },
+      "delete": {
+        "summary": "Delete a trip and all child data",
+        "responses": { "204": { "description": "Deleted" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/api/trips/{trip_key}/days": {
+      "parameters": [{ "$ref": "#/components/parameters/TripKey" }],
+      "get": {
+        "summary": "List days in a trip",
+        "responses": { "200": { "description": "Trip days", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/TripDay" } } } } }, "404": { "$ref": "#/components/responses/NotFound" } }
+      },
+      "post": {
+        "summary": "Add a trip day",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TripDayInput" } } } },
+        "responses": { "201": { "description": "Created" }, "400": { "$ref": "#/components/responses/BadRequest" }, "404": { "$ref": "#/components/responses/NotFound" }, "409": { "$ref": "#/components/responses/Conflict" } }
+      }
+    },
+    "/api/days/{trip_day_id}": {
+      "parameters": [{ "$ref": "#/components/parameters/TripDayId" }],
+      "put": {
+        "summary": "Change a trip day date",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TripDayInput" } } } },
+        "responses": { "200": { "description": "Updated" }, "400": { "$ref": "#/components/responses/BadRequest" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      },
+      "delete": {
+        "summary": "Delete a trip day and its schedules",
+        "responses": { "204": { "description": "Deleted" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/api/days/{trip_day_id}/schedules": {
+      "parameters": [{ "$ref": "#/components/parameters/TripDayId" }],
+      "get": {
+        "summary": "List schedules for a day",
+        "responses": { "200": { "description": "Schedules", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Schedule" } } } } }, "404": { "$ref": "#/components/responses/NotFound" } }
+      },
+      "post": {
+        "summary": "Create a schedule entry",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ScheduleInput" } } } },
+        "responses": { "201": { "description": "Created" }, "400": { "$ref": "#/components/responses/BadRequest" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/api/schedules/{schedule_id}": {
+      "parameters": [{ "$ref": "#/components/parameters/ScheduleId" }],
+      "get": {
+        "summary": "Get a schedule entry",
+        "responses": { "200": { "description": "Schedule", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Schedule" } } } }, "404": { "$ref": "#/components/responses/NotFound" } }
+      },
+      "put": {
+        "summary": "Update a schedule entry",
+        "description": "The schedule type cannot be changed.",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ScheduleUpdate" } } } },
+        "responses": { "200": { "description": "Updated" }, "400": { "$ref": "#/components/responses/BadRequest" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      },
+      "delete": {
+        "summary": "Delete a schedule entry",
+        "responses": { "204": { "description": "Deleted" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "TripKey": { "name": "trip_key", "in": "path", "required": true, "schema": { "type": "string" }, "example": "japan-2026" },
+      "TripDayId": { "name": "trip_day_id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 1 },
+      "ScheduleId": { "name": "schedule_id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 1 }
+    },
+    "responses": {
+      "BadRequest": { "description": "Invalid request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "NotFound": { "description": "Resource not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "Conflict": { "description": "Database constraint conflict", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+    },
+    "schemas": {
+      "Trip": {
+        "type": "object",
+        "required": ["trip_key", "trip_name", "start_date", "end_date"],
+        "properties": {
+          "trip_key": { "type": "string", "example": "japan-2026" },
+          "trip_name": { "type": "string", "example": "Japan 2026" },
+          "start_date": { "type": "string", "format": "date", "example": "2026-10-01" },
+          "end_date": { "type": "string", "format": "date", "example": "2026-10-10" }
+        }
+      },
+      "TripUpdate": {
+        "type": "object",
+        "required": ["trip_name", "start_date", "end_date"],
+        "properties": {
+          "trip_name": { "type": "string", "example": "Japan 2026" },
+          "start_date": { "type": "string", "format": "date" },
+          "end_date": { "type": "string", "format": "date" }
+        }
+      },
+      "TripDay": {
+        "type": "object",
+        "required": ["trip_day_id", "trip_key", "day_date"],
+        "properties": {
+          "trip_day_id": { "type": "integer", "example": 1 },
+          "trip_key": { "type": "string", "example": "japan-2026" },
+          "day_date": { "type": "string", "format": "date", "example": "2026-10-01" }
+        }
+      },
+      "TripDayInput": {
+        "type": "object",
+        "required": ["day_date"],
+        "properties": { "day_date": { "type": "string", "format": "date", "example": "2026-10-01" } }
+      },
+      "Schedule": {
+        "oneOf": [
+          { "$ref": "#/components/schemas/TravelLocation" },
+          { "$ref": "#/components/schemas/Transportation" },
+          { "$ref": "#/components/schemas/Accommodation" }
+        ]
+      },
+      "ScheduleInput": {
+        "oneOf": [
+          { "$ref": "#/components/schemas/TravelLocationInput" },
+          { "$ref": "#/components/schemas/TransportationInput" },
+          { "$ref": "#/components/schemas/AccommodationInput" }
+        ]
+      },
+      "ScheduleUpdate": {
+        "type": "object",
+        "properties": {
+          "scheduled_time": { "type": "string", "example": "09:30" },
+          "travel_location_name": { "type": "string" },
+          "transportation_name": { "type": "string" },
+          "accommodation_name": { "type": "string" },
+          "is_free": { "type": "boolean" },
+          "ticket_purchased": { "type": "boolean" },
+          "is_booked": { "type": "boolean" },
+          "detail_link": { "type": "string", "format": "uri" },
+          "description": { "type": "string" }
+        }
+      },
+      "ScheduleBase": {
+        "type": "object",
+        "required": ["schedule_id", "trip_day_id", "scheduled_time", "schedule_type"],
+        "properties": {
+          "schedule_id": { "type": "integer", "example": 1 },
+          "trip_day_id": { "type": "integer", "example": 1 },
+          "scheduled_time": { "type": "string", "example": "09:30" },
+          "schedule_type": { "type": "string" }
+        }
+      },
+      "TravelLocation": {
+        "allOf": [
+          { "$ref": "#/components/schemas/ScheduleBase" },
+          { "type": "object", "properties": { "schedule_type": { "type": "string", "enum": ["travel_location"] }, "travel_location_name": { "type": "string" }, "is_free": { "type": "boolean" }, "ticket_purchased": { "type": "boolean" }, "detail_link": { "type": "string", "format": "uri" }, "description": { "type": "string" } } }
+        ]
+      },
+      "Transportation": {
+        "allOf": [
+          { "$ref": "#/components/schemas/ScheduleBase" },
+          { "type": "object", "properties": { "schedule_type": { "type": "string", "enum": ["transportation"] }, "transportation_name": { "type": "string" }, "is_booked": { "type": "boolean" } } }
+        ]
+      },
+      "Accommodation": {
+        "allOf": [
+          { "$ref": "#/components/schemas/ScheduleBase" },
+          { "type": "object", "properties": { "schedule_type": { "type": "string", "enum": ["accommodation"] }, "accommodation_name": { "type": "string" }, "detail_link": { "type": "string", "format": "uri" }, "is_booked": { "type": "boolean" } } }
+        ]
+      },
+      "TravelLocationInput": {
+        "type": "object",
+        "required": ["scheduled_time", "schedule_type", "travel_location_name", "is_free"],
+        "properties": {
+          "scheduled_time": { "type": "string", "example": "09:30" },
+          "schedule_type": { "type": "string", "enum": ["travel_location"] },
+          "travel_location_name": { "type": "string", "example": "Senso-ji" },
+          "is_free": { "type": "boolean", "example": false },
+          "ticket_purchased": { "type": "boolean", "default": false },
+          "detail_link": { "type": "string", "format": "uri" },
+          "description": { "type": "string" }
+        }
+      },
+      "TransportationInput": {
+        "type": "object",
+        "required": ["scheduled_time", "schedule_type", "transportation_name"],
+        "properties": {
+          "scheduled_time": { "type": "string", "example": "13:00" },
+          "schedule_type": { "type": "string", "enum": ["transportation"] },
+          "transportation_name": { "type": "string", "example": "Airport Express" },
+          "is_booked": { "type": "boolean", "default": false }
+        }
+      },
+      "AccommodationInput": {
+        "type": "object",
+        "required": ["scheduled_time", "schedule_type", "accommodation_name"],
+        "properties": {
+          "scheduled_time": { "type": "string", "example": "15:00" },
+          "schedule_type": { "type": "string", "enum": ["accommodation"] },
+          "accommodation_name": { "type": "string", "example": "Hotel Sakura" },
+          "detail_link": { "type": "string", "format": "uri" },
+          "is_booked": { "type": "boolean", "default": false }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "properties": { "error": { "type": "string", "example": "Trip not found" } }
+      }
+    }
+  }
+}
