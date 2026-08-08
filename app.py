@@ -17,6 +17,7 @@ BASE_DIR = Path(__file__).resolve().parent
 DATABASE_PATH = Path(os.environ.get("TRAVEL_PLANNER_DB", BASE_DIR / "travel_planner.db"))
 OPENAPI_PATH = BASE_DIR / "openapi.json"
 SWAGGER_UI_PATH = BASE_DIR / "swagger.html"
+VERCEL_FRONTEND_ORIGIN = "https://trip-planner-psi-ruby.vercel.app"
 
 DETAIL_TABLES = {
     "travel_location": (
@@ -163,7 +164,9 @@ class TravelPlannerHandler(BaseHTTPRequestHandler):
         self.handle_request()
 
     def send_cors_headers(self):
-        self.send_header("Access-Control-Allow-Origin", "*")
+        origin = self.headers.get("Origin")
+        allowed_origin = VERCEL_FRONTEND_ORIGIN if origin == VERCEL_FRONTEND_ORIGIN else "*"
+        self.send_header("Access-Control-Allow-Origin", allowed_origin)
         self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
 
@@ -214,7 +217,16 @@ class TravelPlannerHandler(BaseHTTPRequestHandler):
         if self.command == "GET" and path == ["health"]:
             return HTTPStatus.OK, {"status": "ok"}
         if self.command == "GET" and path == ["openapi.json"]:
-            return HTTPStatus.OK, json.loads(OPENAPI_PATH.read_text(encoding="utf-8"))
+            specification = json.loads(OPENAPI_PATH.read_text(encoding="utf-8"))
+            host = self.headers.get("Host")
+            if host:
+                specification["servers"] = [
+                    {
+                        "url": f"http://{host}",
+                        "description": "Current server",
+                    }
+                ]
+            return HTTPStatus.OK, specification
         if self.command == "GET" and path == ["docs"]:
             self.send_html(HTTPStatus.OK, SWAGGER_UI_PATH.read_text(encoding="utf-8"))
             return None, None

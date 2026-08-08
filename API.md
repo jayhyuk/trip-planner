@@ -13,14 +13,17 @@ existing `travel_planner.db` beside `app.py`. Create this database with
 `schema.sql` before starting the server. Set `TRAVEL_PLANNER_DB`,
 `TRAVEL_PLANNER_HOST`, or `TRAVEL_PLANNER_PORT` to override those defaults.
 
-All responses are JSON. Browser clients may call the API from another origin;
-the server sends permissive CORS headers for local frontend development.
+All responses are JSON. The server permits cross-origin calls, including from
+`https://trip-planner-psi-ruby.vercel.app`, for frontend development.
 
 ## Interactive API documentation
 
 After starting the server, open [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 to use the Swagger UI page. It includes request forms and **Try it out** buttons.
 The raw OpenAPI document is also available at `/openapi.json`.
+
+Open `/docs` through the running server, not by double-clicking `swagger.html`;
+opening the HTML file directly uses a `file://` URL and cannot make API requests.
 
 ## Models
 

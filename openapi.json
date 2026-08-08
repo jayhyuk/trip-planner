@@ -6,7 +6,7 @@
     "description": "API for trips, daily itineraries, locations, transportation, and accommodations."
   },
   "servers": [
-    { "url": "/", "description": "Current server" }
+    { "url": "http://127.0.0.1:8000", "description": "Local development server" }
   ],
   "paths": {
     "/health": {
