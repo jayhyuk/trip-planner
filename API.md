@@ -187,3 +187,22 @@ Invalid requests return a JSON object such as:
 
 The API uses `400` for invalid data, `404` for missing resources, and `409`
 for duplicate keys or other database constraint conflicts.
+
+## Trip todos and option comparison
+
+Run `00002_trip_todos.sql` once against the existing database before using
+these endpoints. A todo belongs to a trip and has `todo_name` and a `status`
+of `open` or `close`. A todo option requires `option_name`; `description`,
+`price`, `detail_link`, `option_date`, and `image_urls` are optional.
+
+| Method | URL | Purpose |
+| --- | --- | --- |
+| `GET`, `POST` | `/api/trips/{trip_key}/todos` | List or create trip todos |
+| `GET`, `PUT`, `DELETE` | `/api/todos/{todo_id}` | Read, update, or delete a todo |
+| `GET`, `POST` | `/api/todos/{todo_id}/options` | List or create options |
+| `GET` | `/api/todos/{todo_id}/compare` | Return todo options for a comparison view |
+| `GET`, `PUT`, `DELETE` | `/api/todo-options/{option_id}` | Read, update, or delete an option |
+
+The comparison response contains `columns` and an `options` array, with each
+option containing its `image_urls`. This can be rendered directly as a
+comparison table or cards in the frontend.

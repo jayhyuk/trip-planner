@@ -94,13 +94,48 @@
         "summary": "Delete a schedule entry",
         "responses": { "204": { "description": "Deleted" }, "404": { "$ref": "#/components/responses/NotFound" } }
       }
+    },
+    "/api/trips/{trip_key}/todos": {
+      "parameters": [{ "$ref": "#/components/parameters/TripKey" }],
+      "get": {
+        "summary": "List todos for a trip",
+        "responses": { "200": { "description": "Trip todos", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/TripTodo" } } } } }, "404": { "$ref": "#/components/responses/NotFound" } }
+      },
+      "post": {
+        "summary": "Create a trip todo",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TripTodoInput" } } } },
+        "responses": { "201": { "description": "Created" }, "400": { "$ref": "#/components/responses/BadRequest" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/api/todos/{todo_id}": {
+      "parameters": [{ "$ref": "#/components/parameters/TodoId" }],
+      "get": { "summary": "Get a todo with options", "responses": { "200": { "description": "Todo", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TripTodoWithOptions" } } } }, "404": { "$ref": "#/components/responses/NotFound" } } },
+      "put": { "summary": "Update todo name or status", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TripTodoUpdate" } } } }, "responses": { "200": { "description": "Updated" }, "400": { "$ref": "#/components/responses/BadRequest" }, "404": { "$ref": "#/components/responses/NotFound" } } },
+      "delete": { "summary": "Delete a todo and its options", "responses": { "204": { "description": "Deleted" }, "404": { "$ref": "#/components/responses/NotFound" } } }
+    },
+    "/api/todos/{todo_id}/options": {
+      "parameters": [{ "$ref": "#/components/parameters/TodoId" }],
+      "get": { "summary": "List options for a todo", "responses": { "200": { "description": "Options", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/TodoOption" } } } } }, "404": { "$ref": "#/components/responses/NotFound" } } },
+      "post": { "summary": "Add an option to a todo", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TodoOptionInput" } } } }, "responses": { "201": { "description": "Created" }, "400": { "$ref": "#/components/responses/BadRequest" }, "404": { "$ref": "#/components/responses/NotFound" } } }
+    },
+    "/api/todos/{todo_id}/compare": {
+      "parameters": [{ "$ref": "#/components/parameters/TodoId" }],
+      "get": { "summary": "Get frontend comparison data for todo options", "responses": { "200": { "description": "Comparison view", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TodoComparison" } } } }, "404": { "$ref": "#/components/responses/NotFound" } } }
+    },
+    "/api/todo-options/{option_id}": {
+      "parameters": [{ "$ref": "#/components/parameters/TodoOptionId" }],
+      "get": { "summary": "Get a todo option", "responses": { "200": { "description": "Option", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TodoOption" } } } }, "404": { "$ref": "#/components/responses/NotFound" } } },
+      "put": { "summary": "Update an option and optionally replace all image URLs", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TodoOptionUpdate" } } } }, "responses": { "200": { "description": "Updated" }, "400": { "$ref": "#/components/responses/BadRequest" }, "404": { "$ref": "#/components/responses/NotFound" } } },
+      "delete": { "summary": "Delete an option", "responses": { "204": { "description": "Deleted" }, "404": { "$ref": "#/components/responses/NotFound" } } }
     }
   },
   "components": {
     "parameters": {
       "TripKey": { "name": "trip_key", "in": "path", "required": true, "schema": { "type": "string" }, "example": "japan-2026" },
       "TripDayId": { "name": "trip_day_id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 1 },
-      "ScheduleId": { "name": "schedule_id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 1 }
+      "ScheduleId": { "name": "schedule_id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 1 },
+      "TodoId": { "name": "todo_id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 1 },
+      "TodoOptionId": { "name": "option_id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 1 }
     },
     "responses": {
       "BadRequest": { "description": "Invalid request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
@@ -230,6 +265,42 @@
           "detail_link": { "type": "string", "format": "uri" },
           "is_booked": { "type": "boolean", "default": false }
         }
+      },
+      "TripTodo": {
+        "type": "object",
+        "required": ["todo_id", "trip_key", "todo_name", "status"],
+        "properties": { "todo_id": { "type": "integer", "example": 1 }, "trip_key": { "type": "string", "example": "japan-2026" }, "todo_name": { "type": "string", "example": "Choose a hotel" }, "status": { "type": "string", "enum": ["open", "close"], "example": "open" } }
+      },
+      "TripTodoInput": {
+        "type": "object",
+        "required": ["todo_name"],
+        "properties": { "todo_name": { "type": "string", "example": "Choose a hotel" }, "status": { "type": "string", "enum": ["open", "close"], "default": "open" } }
+      },
+      "TripTodoUpdate": {
+        "type": "object",
+        "properties": { "todo_name": { "type": "string" }, "status": { "type": "string", "enum": ["open", "close"] } }
+      },
+      "TripTodoWithOptions": {
+        "allOf": [{ "$ref": "#/components/schemas/TripTodo" }, { "type": "object", "properties": { "options": { "type": "array", "items": { "$ref": "#/components/schemas/TodoOption" } } } }]
+      },
+      "TodoOption": {
+        "type": "object",
+        "required": ["option_id", "todo_id", "option_name", "image_urls"],
+        "properties": { "option_id": { "type": "integer", "example": 1 }, "todo_id": { "type": "integer", "example": 1 }, "option_name": { "type": "string", "example": "Hotel Sakura" }, "description": { "type": "string", "nullable": true }, "price": { "type": "number", "nullable": true, "example": 2200 }, "detail_link": { "type": "string", "format": "uri", "nullable": true }, "option_date": { "type": "string", "format": "date", "nullable": true }, "image_urls": { "type": "array", "items": { "type": "string", "format": "uri" } } }
+      },
+      "TodoOptionInput": {
+        "type": "object",
+        "required": ["option_name"],
+        "properties": { "option_name": { "type": "string", "example": "Hotel Sakura" }, "description": { "type": "string" }, "price": { "type": "number", "minimum": 0 }, "detail_link": { "type": "string", "format": "uri" }, "option_date": { "type": "string", "format": "date" }, "image_urls": { "type": "array", "items": { "type": "string", "format": "uri" } } }
+      },
+      "TodoOptionUpdate": {
+        "type": "object",
+        "properties": { "option_name": { "type": "string" }, "description": { "type": "string", "nullable": true }, "price": { "type": "number", "minimum": 0, "nullable": true }, "detail_link": { "type": "string", "format": "uri", "nullable": true }, "option_date": { "type": "string", "format": "date", "nullable": true }, "image_urls": { "type": "array", "items": { "type": "string", "format": "uri" } } }
+      },
+      "TodoComparison": {
+        "type": "object",
+        "required": ["todo", "columns", "options"],
+        "properties": { "todo": { "$ref": "#/components/schemas/TripTodo" }, "columns": { "type": "array", "items": { "type": "string" } }, "options": { "type": "array", "items": { "$ref": "#/components/schemas/TodoOption" } } }
       },
       "Error": {
         "type": "object",

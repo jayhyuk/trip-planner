@@ -139,6 +139,62 @@ def schedule_by_id(connection, schedule_id):
     return serialize_schedule(connection, schedule)
 
 
+def validate_todo_status(status):
+    if status not in ("open", "close"):
+        raise ApiError(HTTPStatus.BAD_REQUEST, "status must be 'open' or 'close'")
+
+
+def validate_option_data(data, is_new):
+    if is_new:
+        require_fields(data, "option_name")
+    if "option_date" in data and data["option_date"] is not None:
+        validate_date(data["option_date"], "option_date")
+    if "price" in data and data["price"] is not None:
+        if isinstance(data["price"], bool) or not isinstance(data["price"], (int, float)):
+            raise ApiError(HTTPStatus.BAD_REQUEST, "price must be a number")
+        if data["price"] < 0:
+            raise ApiError(HTTPStatus.BAD_REQUEST, "price cannot be negative")
+    if "image_urls" in data:
+        image_urls = data["image_urls"]
+        if not isinstance(image_urls, list) or any(not isinstance(url, str) or not url for url in image_urls):
+            raise ApiError(HTTPStatus.BAD_REQUEST, "image_urls must be a list of non-empty URLs")
+
+
+def option_by_id(connection, option_id):
+    option = connection.execute(
+        "SELECT option_id, todo_id, option_name, description, price, detail_link, option_date "
+        "FROM trip_todo_options WHERE option_id = ?",
+        (option_id,),
+    ).fetchone()
+    if option is None:
+        raise ApiError(HTTPStatus.NOT_FOUND, "Todo option not found")
+    result = dict(option)
+    result["image_urls"] = [
+        row["image_url"] for row in connection.execute(
+            "SELECT image_url FROM trip_todo_option_images WHERE option_id = ? ORDER BY image_id",
+            (option_id,),
+        )
+    ]
+    return result
+
+
+def todo_by_id(connection, todo_id, include_options=False):
+    todo = connection.execute(
+        "SELECT todo_id, trip_key, todo_name, status FROM trip_todos WHERE todo_id = ?",
+        (todo_id,),
+    ).fetchone()
+    if todo is None:
+        raise ApiError(HTTPStatus.NOT_FOUND, "Trip todo not found")
+    result = dict(todo)
+    if include_options:
+        option_ids = connection.execute(
+            "SELECT option_id FROM trip_todo_options WHERE todo_id = ? ORDER BY option_id",
+            (todo_id,),
+        )
+        result["options"] = [option_by_id(connection, row["option_id"]) for row in option_ids]
+    return result
+
+
 class TravelPlannerHandler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
@@ -255,6 +311,20 @@ class TravelPlannerHandler(BaseHTTPRequestHandler):
                     return self.trip_route(connection, trip_key)
                 if len(path) == 4 and path[3] == "days":
                     return self.trip_days_route(connection, trip_key)
+                if len(path) == 4 and path[3] == "todos":
+                    return self.trip_todos_route(connection, trip_key)
+
+            if len(path) == 4 and path[1] == "todos" and path[3] == "options":
+                return self.todo_options_route(connection, self.integer_id(path[2], "todo"))
+
+            if len(path) == 4 and path[1] == "todos" and path[3] == "compare":
+                return self.todo_compare_route(connection, self.integer_id(path[2], "todo"))
+
+            if len(path) == 3 and path[1] == "todos":
+                return self.todo_route(connection, self.integer_id(path[2], "todo"))
+
+            if len(path) == 3 and path[1] == "todo-options":
+                return self.todo_option_route(connection, self.integer_id(path[2], "todo option"))
 
             if len(path) == 3 and path[1] == "days":
                 return self.day_route(connection, self.integer_id(path[2], "trip day"))
@@ -384,6 +454,124 @@ class TravelPlannerHandler(BaseHTTPRequestHandler):
             )
             return HTTPStatus.CREATED, schedule_by_id(connection, schedule_id)
         raise ApiError(HTTPStatus.METHOD_NOT_ALLOWED, "Method not allowed")
+
+    def trip_todos_route(self, connection, trip_key):
+        trip_exists = connection.execute("SELECT 1 FROM trips WHERE trip_key = ?", (trip_key,)).fetchone()
+        if trip_exists is None:
+            raise ApiError(HTTPStatus.NOT_FOUND, "Trip not found")
+        if self.command == "GET":
+            todos = connection.execute(
+                "SELECT todo_id FROM trip_todos WHERE trip_key = ? ORDER BY todo_id",
+                (trip_key,),
+            )
+            return HTTPStatus.OK, [todo_by_id(connection, row["todo_id"]) for row in todos]
+        if self.command == "POST":
+            data = self.request_data()
+            require_fields(data, "todo_name")
+            status = data.get("status", "open")
+            validate_todo_status(status)
+            cursor = connection.execute(
+                "INSERT INTO trip_todos (trip_key, todo_name, status) VALUES (?, ?, ?)",
+                (trip_key, data["todo_name"], status),
+            )
+            return HTTPStatus.CREATED, todo_by_id(connection, cursor.lastrowid)
+        raise ApiError(HTTPStatus.METHOD_NOT_ALLOWED, "Method not allowed")
+
+    def todo_route(self, connection, todo_id):
+        if self.command == "GET":
+            return HTTPStatus.OK, todo_by_id(connection, todo_id, include_options=True)
+        current = todo_by_id(connection, todo_id)
+        if self.command == "PUT":
+            data = self.request_data()
+            updates = {}
+            if "todo_name" in data:
+                if not data["todo_name"]:
+                    raise ApiError(HTTPStatus.BAD_REQUEST, "todo_name cannot be empty")
+                updates["todo_name"] = data["todo_name"]
+            if "status" in data:
+                validate_todo_status(data["status"])
+                updates["status"] = data["status"]
+            if not updates:
+                raise ApiError(HTTPStatus.BAD_REQUEST, "Provide todo_name or status to update")
+            assignments = ", ".join(f"{field} = ?" for field in updates)
+            connection.execute(
+                f"UPDATE trip_todos SET {assignments} WHERE todo_id = ?",
+                (*updates.values(), todo_id),
+            )
+            return HTTPStatus.OK, todo_by_id(connection, todo_id)
+        if self.command == "DELETE":
+            connection.execute("DELETE FROM trip_todos WHERE todo_id = ?", (todo_id,))
+            return HTTPStatus.NO_CONTENT, None
+        raise ApiError(HTTPStatus.METHOD_NOT_ALLOWED, "Method not allowed")
+
+    def todo_options_route(self, connection, todo_id):
+        todo_by_id(connection, todo_id)
+        if self.command == "GET":
+            options = connection.execute(
+                "SELECT option_id FROM trip_todo_options WHERE todo_id = ? ORDER BY option_id",
+                (todo_id,),
+            )
+            return HTTPStatus.OK, [option_by_id(connection, row["option_id"]) for row in options]
+        if self.command == "POST":
+            data = self.request_data()
+            validate_option_data(data, is_new=True)
+            fields = ("option_name", "description", "price", "detail_link", "option_date")
+            values = [data.get(field) for field in fields]
+            cursor = connection.execute(
+                "INSERT INTO trip_todo_options (todo_id, option_name, description, price, detail_link, option_date) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (todo_id, *values),
+            )
+            self.replace_option_images(connection, cursor.lastrowid, data.get("image_urls", []))
+            return HTTPStatus.CREATED, option_by_id(connection, cursor.lastrowid)
+        raise ApiError(HTTPStatus.METHOD_NOT_ALLOWED, "Method not allowed")
+
+    def todo_option_route(self, connection, option_id):
+        current = option_by_id(connection, option_id)
+        if self.command == "GET":
+            return HTTPStatus.OK, current
+        if self.command == "PUT":
+            data = self.request_data()
+            validate_option_data(data, is_new=False)
+            allowed_fields = ("option_name", "description", "price", "detail_link", "option_date")
+            updates = {field: data[field] for field in allowed_fields if field in data}
+            if "option_name" in updates and not updates["option_name"]:
+                raise ApiError(HTTPStatus.BAD_REQUEST, "option_name cannot be empty")
+            if not updates and "image_urls" not in data:
+                raise ApiError(HTTPStatus.BAD_REQUEST, "Provide an option field or image_urls to update")
+            if updates:
+                assignments = ", ".join(f"{field} = ?" for field in updates)
+                connection.execute(
+                    f"UPDATE trip_todo_options SET {assignments} WHERE option_id = ?",
+                    (*updates.values(), option_id),
+                )
+            if "image_urls" in data:
+                self.replace_option_images(connection, option_id, data["image_urls"])
+            return HTTPStatus.OK, option_by_id(connection, option_id)
+        if self.command == "DELETE":
+            connection.execute("DELETE FROM trip_todo_options WHERE option_id = ?", (option_id,))
+            return HTTPStatus.NO_CONTENT, None
+        raise ApiError(HTTPStatus.METHOD_NOT_ALLOWED, "Method not allowed")
+
+    def todo_compare_route(self, connection, todo_id):
+        todo = todo_by_id(connection, todo_id)
+        options = connection.execute(
+            "SELECT option_id FROM trip_todo_options WHERE todo_id = ? ORDER BY option_id",
+            (todo_id,),
+        )
+        return HTTPStatus.OK, {
+            "todo": todo,
+            "columns": ["option_name", "description", "price", "detail_link", "option_date", "image_urls"],
+            "options": [option_by_id(connection, row["option_id"]) for row in options],
+        }
+
+    @staticmethod
+    def replace_option_images(connection, option_id, image_urls):
+        connection.execute("DELETE FROM trip_todo_option_images WHERE option_id = ?", (option_id,))
+        connection.executemany(
+            "INSERT INTO trip_todo_option_images (option_id, image_url) VALUES (?, ?)",
+            [(option_id, image_url) for image_url in image_urls],
+        )
 
     def schedule_route(self, connection, schedule_id):
         current = schedule_by_id(connection, schedule_id)
